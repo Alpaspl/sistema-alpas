@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ALPAS • Gestão do Abrigo</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px Arial,sans-serif;background:#f5f7f4;color:#263229}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:235px;background:#fff;border-right:1px solid #dfe7dc;padding:16px 12px;overflow:auto}
+.logo{font-size:25px;font-weight:800;color:#557b4d;padding:8px 10px 18px}.nav{display:block;width:100%;border:0;background:transparent;text-align:left;padding:11px;border-radius:9px;margin:2px 0;color:#344137;cursor:pointer}.nav:hover,.nav.active{background:#e9f1e6;color:#31552d;font-weight:700}
+.main{margin-left:235px}.top{height:64px;background:#557b4d;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px}.content{max-width:1400px;margin:auto;padding:24px}
+h1{margin:0 0 6px}.muted{color:#718076}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin:18px 0}.card{background:#fff;border:1px solid #dfe7dc;border-radius:14px;padding:18px;box-shadow:0 3px 12px #0000000b;margin-bottom:16px}.metric{font-size:29px;font-weight:800;margin-top:5px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:12px}.field label{display:block;font-size:12px;font-weight:700;margin-bottom:5px}.field input,.field select,.field textarea{width:100%;padding:10px;border:1px solid #ccd8c9;border-radius:8px;background:#fff}.full{grid-column:1/-1}
+.btn{border:0;border-radius:9px;padding:10px 14px;background:#557b4d;color:#fff;font-weight:700;cursor:pointer}.btn.alt{background:#edf2eb;color:#42643b}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}.search{flex:1;min-width:220px;padding:10px;border:1px solid #ccd8c9;border-radius:8px}
+.wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:9px;border-bottom:1px solid #e2e9df;text-align:left;vertical-align:top}.table th{background:#f1f5ef}.badge{display:inline-block;padding:4px 8px;border-radius:99px;background:#edf4ea;color:#42643b;font-size:11px}
+.animals{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}.animal{background:#fff;border:1px solid #dfe7dc;border-radius:13px;overflow:hidden}.animal img,.ph{width:100%;height:145px;object-fit:cover}.ph{display:grid;place-items:center;font-size:52px;background:#edf2eb}.animal .body{padding:12px}
+.status{padding:10px;border-radius:9px;background:#edf4ea;margin:10px 0}.danger{background:#fff0ef;color:#9b3b32}.hidden{display:none}
+@media(max-width:800px){.sidebar{width:65px}.logo span,.nav span{display:none}.nav{text-align:center}.main{margin-left:65px}.content{padding:14px}.top{padding:0 12px;font-size:12px}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+<div class="logo">🐾 <span>ALPAS</span></div>
+<button class="nav active" data-page="inicio">🏠 <span>Início</span></button>
+<button class="nav" data-page="animais">🐾 <span>Animais</span></button>
+<button class="nav" data-page="compras">🛒 <span>Compras / Insumos</span></button>
+<button class="nav" data-page="saude">🏥 <span>Clínica / Doenças</span></button>
+<button class="nav" data-page="castracoes">✂️ <span>Castrações</span></button>
+<button class="nav" data-page="medicamentos">💊 <span>Medicamentos</span></button>
+<button class="nav" data-page="banhos">🛁 <span>Banhos</span></button>
+<button class="nav" data-page="limpeza">🧹 <span>Limpeza</span></button>
+<button class="nav" data-page="adocoes">🏠 <span>Adoções</span></button>
+<button class="nav" data-page="despesas">💰 <span>Despesas</span></button>
+<button class="nav" data-page="config">⚙️ <span>Conexão</span></button>
+</aside>
+<main class="main">
+<header class="top"><b id="title">Início</b><span>Associação Lacerdense de Proteção aos Animais — ALPAS</span></header>
+<section class="content" id="app"></section>
+</main>
+
+<script>
+const KEY='ALPAS_COMPLETO_V2';
+let db=JSON.parse(localStorage.getItem(KEY)||'null')||{
+ animais:[],compras:[],saude:[],castracoes:[],medicamentos:[],banhos:[],limpeza:[],adocoes:[],despesas:[]
+};
+let endpoint=localStorage.getItem('ALPAS_ENDPOINT')||'';
+const saveLocal=()=>localStorage.setItem(KEY,JSON.stringify(db));
+const uid=()=>Date.now()+Math.random().toString(16).slice(2);
+const esc=x=>String(x??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const app=document.getElementById('app');
+function money(v){return 'R$ '+(Number(v)||0).toFixed(2).replace('.',',')}
+function animalOptions(){return db.animais.map(a=>`<option value="${esc(a.nome)}">${esc(a.nome)} (${a.especie||''})</option>`).join('')}
+function pageTitle(t){document.getElementById('title').textContent=t}
+document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));b.classList.add('active');({inicio,animais,compras,saude,castracoes,medicamentos,banhos,limpeza,adocoes,despesas,config}[b.dataset.page])()});
+
+function inicio(){
+ pageTitle('Início');
+ const vivos=db.animais.filter(a=>a.situacao!=='Falecido').length;
+ const clin=db.saude.reduce((s,x)=>s+(Number(x.custo)||0),0);
+ const comp=db.compras.reduce((s,x)=>s+(Number(x.valor)||0),0);
+ app.innerHTML=`<h1>Olá! 👋</h1><p class="muted">Controle dos animais, saúde, compras e rotina do abrigo.</p>
+ ${cards([[db.animais.length,'🐾 Animais'],[vivos,'❤️ Vivos'],[db.animais.filter(a=>a.especie==='Cão').length,'🐶 Cães'],[db.animais.filter(a=>a.especie==='Gato').length,'🐱 Gatos'],[db.castracoes.length,'✂️ Castrações'],[db.adocoes.length,'🏠 Adoções'],[money(clin),'🏥 Clínicas'],[money(comp),'🛒 Compras']])}
+ <div class="card"><h2>📌 Organização</h2><p>Em <b>Compras / Insumos</b> você registra ração, areia, alimentos, medicamentos e materiais de limpeza, com data, quantidade e valor.</p><p>Em <b>Clínica / Doenças</b> você registra entrada, saída, retorno, diagnóstico e custo.</p><p>Em <b>Castrações</b> fica o histórico de cada animal castrado.</p></div>`;
+}
+function cards(a){return '<div class="cards">'+a.map(x=>`<div class="card"><div class="muted">${x[1]}</div><div class="metric">${x[0]}</div></div>`).join('')+'</div>'}
+
+function animais(){
+ pageTitle('Animais');
+ app.innerHTML=`<h1>🐾 Animais</h1><div class="toolbar"><input id="aq" class="search" placeholder="Pesquisar animal..." oninput="renderAnimals()"><button class="btn" onclick="animalForm()">➕ Novo animal</button></div><div id="animalList" class="animals"></div>`;
+ renderAnimals();
+}
+function renderAnimals(){
+  const q=(document.getElementById('aq')?.value||'').toLowerCase();
+  const arr=db.animais.filter(a=>(a.nome||'').toLowerCase().includes(q));
+  document.getElementById('animalList').innerHTML=arr.map(a=>`<div class="animal">${a.foto?`<img src="${a.foto}">`:`<div class="ph">${a.especie==='Gato'?'🐱':'🐶'}</div>`}<div class="body"><h3>${esc(a.nome)}</h3><p class="muted">${esc(a.especie)} • ${esc(a.sexo)} • Castrado: ${esc(a.castrado)}</p><span class="badge">${esc(a.situacao)}</span><p><button class="btn" onclick="viewAnimal('${a.id}')">Ver ficha</button> <button class="btn alt" onclick="editAnimal('${a.id}')">✏️ Editar</button> <button class="btn alt" onclick="deleteAnimal('${a.id}')">🗑️ Excluir</button></p></div></div>`).join('')||'<div class="card">Nenhum animal cadastrado.</div>';
+}
+function animalForm(existing=null){
+  const a=existing||{};
+  app.innerHTML=`<h1>${existing?'✏️ Editar animal':'➕ Cadastro / Entrada do animal'}</h1><div class="card"><form id="animalForm" class="form">
+${F('nome','Nome',1)}${F('dataResgate','Data do resgate','date')}${F('resgatou','Quem resgatou')}${F('local','Local do resgate')}${S('especie','Espécie',['Cão','Gato'])}${S('sexo','Sexo',['Macho','Fêmea'])}${S('castrado','Castrado',['Não','Sim','Agendado'])}${S('situacao','Situação',['No abrigo','Disponível para adoção','Em tratamento','Lar temporário','Adotado','Falecido'])}${F('foto','Foto','file')}<div class="field full"><label>Situação em que estava / observações</label><textarea name="obs" rows="4"></textarea></div><div class="full"><button class="btn">💾 ${existing?'Salvar alterações':'Salvar animal'}</button> <button type="button" class="btn alt" onclick="animais()">Cancelar</button></div></form><div id="as" class="status hidden"></div></div>`;
+  const form=document.getElementById('animalForm');
+  Object.keys(a).forEach(k=>{const el=form.elements[k];if(el&&k!=='foto')el.value=a[k]??''});
+  form.onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),o={id:existing?.id||uid()};for(let [k,v] of f.entries())if(k!=='foto')o[k]=v;let file=f.get('foto');if(file&&file.size)o.foto=await dataUrl(file);else if(existing?.foto)o.foto=existing.foto;
+    if(existing){const dr=await deleteRemote('ANIMAIS',existing.id);if(endpoint&&!dr.sucesso){alert('Não foi possível atualizar no Google Drive: '+(dr.erro||'erro'));return;}db.animais=db.animais.filter(x=>x.id!==existing.id);}
+    db.animais.push(o);saveLocal();const r=await sync('animal',o,file);if(r.id)o.id=r.id;saveLocal();animais();
+  };
+}
+function editAnimal(id){const a=db.animais.find(x=>x.id==id);if(a)animalForm(a)}
+async function deleteRemote(modulo,id){
+  if(!endpoint)return {sucesso:true};
+  try{const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'excluir',modulo,id})});return await r.json()}catch(e){return {sucesso:false,erro:e.message}}
+}
+async function deleteAnimal(id){const a=db.animais.find(x=>x.id==id);if(!a)return;if(!confirm(`Excluir o animal "${a.nome||''}"? Esta ação não pode ser desfeita.`))return;const r=await deleteRemote('ANIMAIS',id);if(endpoint&&!r.sucesso){alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));return;}db.animais=db.animais.filter(x=>x.id!==id);saveLocal();animais();}
+function viewAnimal(id){let a=db.animais.find(x=>x.id==id);app.innerHTML=`<h1>🐾 ${esc(a.nome)}</h1><div class="card">${a.foto?`<img src="${a.foto}" style="max-width:260px;max-height:260px;border-radius:12px">`:''}<p><b>Espécie:</b> ${esc(a.especie)} &nbsp; <b>Sexo:</b> ${esc(a.sexo)} &nbsp; <b>Castrado:</b> ${esc(a.castrado)}</p><p><b>Resgate:</b> ${esc(a.dataResgate)||'-'} &nbsp; <b>Quem resgatou:</b> ${esc(a.resgatou)||'-'}</p><p><b>Local:</b> ${esc(a.local)||'-'}</p><p><b>Situação:</b> ${esc(a.situacao)}</p><p><b>Observações:</b> ${esc(a.obs)||'-'}</p><p><button class="btn alt" onclick="animais()">← Voltar</button> <button class="btn alt" onclick="editAnimal('${a.id}')">✏️ Editar</button> <button class="btn alt" onclick="deleteAnimal('${a.id}')">🗑️ Excluir</button></p></div>`}
+
+
+function compras(){
+ pageTitle('Compras / Insumos');
+ app.innerHTML=`<h1>🛒 Compras / Insumos</h1><p class="muted">Ração, areia, medicamentos, alimentos, materiais de limpeza e outros.</p>
+ <div class="card"><form id="compForm" class="form">${F('data','Data da compra','date')}${S('categoria','Categoria',['Ração','Areia','Medicamento','Alimentos / Patê','Material de limpeza','Insumos','Outros'])}${F('produto','Produto')}${F('quantidade','Quantidade','number')}${F('unidade','Unidade')}${F('fornecedor','Fornecedor')}${F('valor','Valor total (R$)','number')}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar compra</button></div></form></div>${table('compras',['data','Data','categoria','Categoria','produto','Produto','quantidade','Qtd.','unidade','Unidade','valor','Valor'])}`;
+ bindSimple('compForm','compras','compra');
+}
+function saude(){
+ pageTitle('Clínica / Doenças');
+ app.innerHTML=`<h1>🏥 Animais doentes / Clínica</h1><p class="muted">Registre entrada na clínica, saída, retorno ao abrigo, diagnóstico e custo.</p>
+ <div class="card"><form id="healthForm" class="form">${animalSelect('animal','Animal')}${F('entrada','Entrada na clínica','date')}${F('saida','Saída da clínica','date')}${F('retorno','Retorno ao abrigo','date')}${F('clinica','Clínica / veterinário')}${F('diagnostico','Doença / diagnóstico')}${F('custo','Custo (R$)','number')}<div class="field full"><label>Exames, tratamento e observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar atendimento</button></div></form></div>${table('saude',['animal','Animal','entrada','Entrada','saida','Saída','retorno','Retorno','diagnostico','Diagnóstico','custo','Custo'])}`;
+ bindSimple('healthForm','saude','saude');
+}
+function castracoes(){
+ pageTitle('Castrações');
+ app.innerHTML=`<h1>✂️ Controle de castrações</h1><div class="card"><form id="castForm" class="form">${animalSelect('animal','Animal')}${F('data','Data da castração','date')}${F('clinica','Clínica / veterinário')}${F('custo','Custo (R$)','number')}${S('status','Situação',['Agendada','Realizada','Cancelada'])}<div class="field full"><label>Observações / pós-operatório</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar castração</button></div></form></div>${table('castracoes',['animal','Animal','data','Data','clinica','Clínica','custo','Custo','status','Situação'])}`;
+ bindSimple('castForm','castracoes','castracao');
+}
+function medicamentos(){
+ pageTitle('Medicamentos');
+ app.innerHTML=`<h1>💊 Medicamentos</h1><div class="card"><form id="medForm" class="form">${animalSelect('animal','Animal')}${F('medicamento','Medicamento')}${F('inicio','Início','date')}${F('fim','Fim','date')}${F('dosagem','Dosagem / frequência')}${F('custo','Custo (R$)','number')}<div class="field full"><label>Orientação / observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar medicamento</button></div></form></div>${table('medicamentos',['animal','Animal','medicamento','Medicamento','inicio','Início','fim','Fim','dosagem','Dosagem','custo','Custo'])}`;
+ bindSimple('medForm','medicamentos','medicamento');
+}
+function banhos(){
+ pageTitle('Banhos');
+ app.innerHTML=`<h1>🛁 Banhos</h1><div class="card"><form id="banhoForm" class="form">${animalSelect('animal','Animal')}${F('data','Data do banho','date')}${F('proximo','Próximo banho','date')}${F('responsavel','Responsável')}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar banho</button></div></form></div>${table('banhos',['animal','Animal','data','Data','proximo','Próximo','responsavel','Responsável'])}`;
+ bindSimple('banhoForm','banhos','banho');
+}
+function limpeza(){
+ pageTitle('Limpeza');
+ app.innerHTML=`<h1>🧹 Limpeza do abrigo</h1><div class="card"><form id="limpezaForm" class="form">${F('data','Data da limpeza','date')}${F('area','Área / setor')}${F('responsavel','Responsável')}${F('produto','Produto utilizado')}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar limpeza</button></div></form></div>${table('limpeza',['data','Data','area','Área','responsavel','Responsável','produto','Produto'])}`;
+ bindSimple('limpezaForm','limpeza','limpeza');
+}
+function adocoes(){
+ pageTitle('Adoções');
+ app.innerHTML=`<h1>🏠 Adoções</h1><div class="card"><form id="adocaoForm" class="form">${animalSelect('animal','Animal')}${F('data','Data da adoção','date')}${F('adotante','Nome do adotante')}${F('cpf','CPF')}${F('rg','RG')}${F('telefone','Telefone / WhatsApp')}${F('email','E-mail')}${F('endereco','Endereço completo')}${F('foto','Foto / documento','file')}${S('status','Situação',['Em análise','Adotado','Acompanhamento','Cancelado'])}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar adoção</button></div></form></div>${table('adocoes',['animal','Animal','data','Data','adotante','Adotante','telefone','Telefone','endereco','Endereço','status','Situação'])}`;
+ bindSimple('adocaoForm','adocoes','adocao');
+}
+function despesas(){
+ pageTitle('Despesas');
+ app.innerHTML=`<h1>💰 Despesas</h1><div class="card"><form id="despForm" class="form">${F('data','Data','date')}${S('categoria','Categoria',['Clínica','Medicamentos','Ração','Areia','Alimentos','Limpeza','Castração','Outros'])}${F('descricao','Descrição')}${F('valor','Valor (R$)','number')}${F('animal','Animal (se houver)')}<div class="full"><button class="btn">💾 Registrar despesa</button></div></form></div>${table('despesas',['data','Data','categoria','Categoria','descricao','Descrição','animal','Animal','valor','Valor'])}`;
+ bindSimple('despForm','despesas','despesa');
+}
+function config(){
+ pageTitle('Conexão');
+ app.innerHTML=`<h1>⚙️ Conexão com Google Drive</h1><div class="card"><p>O endereço abaixo é a URL do seu Google Apps Script publicada como aplicativo da Web.</p><div class="field"><label>URL /exec</label><input id="ep" value="${esc(endpoint)}" placeholder="https://script.google.com/macros/s/.../exec"></div><button class="btn" onclick="saveEndpoint()">💾 Salvar conexão</button> <button class="btn alt" onclick="testEndpoint()">🔗 Testar</button><div id="conn" class="status hidden"></div></div>
+ <div class="card"><h2>📌 Como os módulos serão armazenados</h2><p>O Drive pode receber pastas para <b>Animais, Compras, Clínica, Castrações, Medicamentos, Banhos, Limpeza e Adoções</b>. Os registros ficam em uma planilha para consulta e relatórios.</p></div>`;
+}
+function saveEndpoint(){endpoint=document.getElementById('ep').value.trim();localStorage.setItem('ALPAS_ENDPOINT',endpoint);alert('Conexão salva.')}
+async function testEndpoint(){let c=document.getElementById('conn');c.classList.remove('hidden');try{let r=await fetch(endpoint);let j=await r.json();c.textContent=j.sucesso?'✅ Sistema ALPAS conectado ao Google Drive.':'❌ '+(j.erro||j.mensagem||'Falha')}catch(e){c.textContent='❌ Não foi possível conectar. Verifique a URL /exec.'}}
+function F(n,l,t='text'){return `<div class="field"><label>${l}</label><input name="${n}" type="${t}"></div>`}
+function S(n,l,o){return `<div class="field"><label>${l}</label><select name="${n}">${o.map(x=>`<option>${x}</option>`).join('')}</select></div>`}
+function animalSelect(n,l){return `<div class="field"><label>${l}</label><select name="${n}"><option value="">Selecione</option>${animalOptions()}</select></div>`}
+function table(k,c){return `<div class="card"><div class="wrap"><table class="table"><thead><tr>${c.map(x=>`<th>${x[1]}</th>`).join('')}</tr></thead><tbody id="${k}Rows">${db[k].slice().reverse().map(x=>'<tr>'+c.map(a=>`<td>${esc(x[a[0]])||'-'}</td>`).join('')+'</tr>').join('')||`<tr><td colspan="${c.length}">Nenhum registro.</td></tr>`}</tbody></table></div></div>`}
+function bindSimple(formId,k,type){document.getElementById(formId).onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),o={id:uid()};for(let [a,b] of f.entries())if(a!=='foto')o[a]=b;let file=f.get('foto');if(file&&file.size)o.foto=await dataUrl(file);db[k].push(o);saveLocal();await sync(type,o,file);e.target.reset();({compras,saude,castracoes,medicamentos,banhos,limpeza,adocoes,despesas}[k])()}}
+function dataUrl(file){return new Promise((res,rej)=>{let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
+async function sync(type,o,file){
+ if(!endpoint)return {sucesso:false,semConexao:true};
+ const modulo={animal:'ANIMAIS',compra:'COMPRAS',saude:'CLÍNICA E DOENÇAS',castracao:'CASTRAÇÕES',medicamento:'MEDICAMENTOS',banho:'BANHOS',limpeza:'LIMPEZA',adocao:'ADOÇÕES',despesa:'DESPESAS'}[type]||type;
+ try{
+   const payload={action:'salvar',modulo,dados:o};
+   if(file&&file.size){payload.foto={name:file.name,mimeType:file.type||'application/octet-stream',data:(o.foto||'').split(',')[1]||''};}
+   const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+   const j=await r.json();
+   if(!j.sucesso) throw new Error(j.erro||j.mensagem||'Falha ao salvar');
+   return j;
+ }catch(e){console.warn('Registro local salvo; sincronização falhou.',e);return {sucesso:false,erro:e.message}}
+}
+inicio();
+</script>
+</body>
+</html>
