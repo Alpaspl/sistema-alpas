@@ -147,7 +147,38 @@ async function testEndpoint(){let c=document.getElementById('conn');c.classList.
 function F(n,l,t='text'){return `<div class="field"><label>${l}</label><input name="${n}" type="${t}"></div>`}
 function S(n,l,o){return `<div class="field"><label>${l}</label><select name="${n}">${o.map(x=>`<option>${x}</option>`).join('')}</select></div>`}
 function animalSelect(n,l){return `<div class="field"><label>${l}</label><select name="${n}"><option value="">Selecione</option>${animalOptions()}</select></div>`}
-function table(k,c){return `<div class="card"><div class="wrap"><table class="table"><thead><tr>${c.map(x=>`<th>${x[1]}</th>`).join('')}</tr></thead><tbody id="${k}Rows">${db[k].slice().reverse().map(x=>'<tr>'+c.map(a=>`<td>${esc(x[a[0]])||'-'}</td>`).join('')+'</tr>').join('')||`<tr><td colspan="${c.length}">Nenhum registro.</td></tr>`}</tbody></table></div></div>`}
+function table(k,c){
+  let colunas=[];
+  for(let i=0;i<c.length;i+=2){
+    colunas.push({
+      campo:c[i],
+      titulo:c[i+1]
+    });
+  }
+
+  return `<div class="card">
+    <div class="wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            ${colunas.map(x=>`<th>${x.titulo}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody id="${k}Rows">
+          ${
+            db[k].slice().reverse().map(x=>
+              '<tr>'+
+              colunas.map(a=>`<td>${esc(x[a.campo])||'-'}</td>`).join('')+
+              '</tr>'
+            ).join('')
+            ||
+            `<tr><td colspan="${colunas.length}">Nenhum registro.</td></tr>`
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
 function bindSimple(formId,k,type){document.getElementById(formId).onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),o={id:uid()};for(let [a,b] of f.entries())if(a!=='foto')o[a]=b;let file=f.get('foto');if(file&&file.size)o.foto=await dataUrl(file);db[k].push(o);saveLocal();await sync(type,o,file);e.target.reset();({compras,saude,castracoes,medicamentos,banhos,limpeza,adocoes,despesas}[k])()}}
 function dataUrl(file){return new Promise((res,rej)=>{let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
 async function sync(type,o,file){
