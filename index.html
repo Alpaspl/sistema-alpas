@@ -102,10 +102,160 @@ function compras(){
  bindSimple('compForm','compras','compra');
 }
 function saude(){
- pageTitle('Clínica / Doenças');
- app.innerHTML=`<h1>🏥 Animais doentes / Clínica</h1><p class="muted">Registre entrada na clínica, saída, retorno ao abrigo, diagnóstico e custo.</p>
- <div class="card"><form id="healthForm" class="form">${animalSelect('animal','Animal')}${F('entrada','Entrada na clínica','date')}${F('saida','Saída da clínica','date')}${F('retorno','Retorno ao abrigo','date')}${F('clinica','Clínica / veterinário')}${F('diagnostico','Doença / diagnóstico')}${F('custo','Custo (R$)','number')}<div class="field full"><label>Exames, tratamento e observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar atendimento</button></div></form></div>${table('saude',['animal','Animal','entrada','Entrada','saida','Saída','retorno','Retorno','diagnostico','Diagnóstico','custo','Custo'])}`;
- bindSimple('healthForm','saude','saude');
+  pageTitle('Clínica / Doenças');
+
+  app.innerHTML=`
+    <h1>🏥 Animais doentes / Clínica</h1>
+    <p class="muted">
+      Registre entrada na clínica, saída, retorno ao abrigo, diagnóstico e custo.
+    </p>
+
+    <div class="card">
+      <form id="healthForm" class="form">
+        ${animalSelect('animal','Animal')}
+        ${F('entrada','Entrada na clínica','date')}
+        ${F('saida','Saída da clínica','date')}
+        ${F('retorno','Retorno ao abrigo','date')}
+        ${F('clinica','Clínica / veterinário')}
+        ${F('diagnostico','Doença / diagnóstico')}
+        ${F('custo','Custo (R$)','number')}
+
+        <div class="field full">
+          <label>Exames, tratamento e observações</label>
+          <textarea name="obs"></textarea>
+        </div>
+
+        <div class="full">
+          <button class="btn">💾 Registrar atendimento</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Animal</th>
+              <th>Entrada</th>
+              <th>Saída</th>
+              <th>Retorno</th>
+              <th>Diagnóstico</th>
+              <th>Custo</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${
+              db.saude.slice().reverse().map(x=>`
+                <tr>
+                  <td>${esc(x.animal)||'-'}</td>
+                  <td>${esc(x.entrada)||'-'}</td>
+                  <td>${esc(x.saida)||'-'}</td>
+                  <td>${esc(x.retorno)||'-'}</td>
+                  <td>${esc(x.diagnostico)||'-'}</td>
+                  <td>${esc(x.custo)||'-'}</td>
+                  <td>
+                    <button class="btn" onclick="editarSaude('${x.id}')">✏️ Editar</button>
+                    <button class="btn alt" onclick="excluirSaude('${x.id}')">🗑️ Excluir</button>
+                  </td>
+                </tr>
+              `).join('')
+              ||
+              `<tr><td colspan="7">Nenhum registro.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  bindSimple('healthForm','saude','saude');
+}
+ function editarSaude(id){
+  const registro=db.saude.find(x=>x.id==id);
+  if(!registro)return;
+
+  pageTitle('Editar atendimento');
+
+  app.innerHTML=`
+    <h1>✏️ Editar atendimento</h1>
+
+    <div class="card">
+      <form id="editHealthForm" class="form">
+        ${animalSelect('animal','Animal')}
+        ${F('entrada','Entrada na clínica','date')}
+        ${F('saida','Saída da clínica','date')}
+        ${F('retorno','Retorno ao abrigo','date')}
+        ${F('clinica','Clínica / veterinário')}
+        ${F('diagnostico','Doença / diagnóstico')}
+        ${F('custo','Custo (R$)','number')}
+
+        <div class="field full">
+          <label>Exames, tratamento e observações</label>
+          <textarea name="obs"></textarea>
+        </div>
+
+        <div class="full">
+          <button class="btn">💾 Salvar alterações</button>
+          <button type="button" class="btn alt" onclick="saude()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  const form=document.getElementById('editHealthForm');
+
+  Object.keys(registro).forEach(k=>{
+    const el=form.elements[k];
+    if(el)el.value=registro[k]??'';
+  });
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    let f=new FormData(e.target);
+    let novo={id:registro.id};
+
+    for(let [k,v] of f.entries()){
+      novo[k]=v;
+    }
+
+    const dr=await deleteRemote('CLÍNICA E DOENÇAS',registro.id);
+
+    if(endpoint && !dr.sucesso){
+      alert('Não foi possível atualizar no Google Drive: '+(dr.erro||'erro'));
+      return;
+    }
+
+    db.saude=db.saude.filter(x=>x.id!==registro.id);
+    db.saude.push(novo);
+    saveLocal();
+
+    await sync('saude',novo,null);
+
+    saude();
+  };
+}
+
+async function excluirSaude(id){
+  const registro=db.saude.find(x=>x.id==id);
+  if(!registro)return;
+
+  if(!confirm('Excluir este atendimento? Esta ação não pode ser desfeita.'))return;
+
+  const r=await deleteRemote('CLÍNICA E DOENÇAS',id);
+
+  if(endpoint && !r.sucesso){
+    alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));
+    return;
+  }
+
+  db.saude=db.saude.filter(x=>x.id!==id);
+  saveLocal();
+
+  saude();
 }
 function castracoes(){
  pageTitle('Castrações');
