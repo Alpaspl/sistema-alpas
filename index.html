@@ -247,7 +247,9 @@ async function excluirSaude(id){
 
   const r=await deleteRemote('CLÍNICA E DOENÇAS',id);
 
-  if(endpoint && !r.sucesso){
+  // Se não estiver no Google Drive, ainda assim permite excluir
+  // o registro que está salvo localmente.
+  if(endpoint && !r.sucesso && r.erro!=='Registro não encontrado.'){
     alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));
     return;
   }
