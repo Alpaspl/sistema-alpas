@@ -87,7 +87,26 @@ async function deleteRemote(modulo,id){
   if(!endpoint)return {sucesso:true};
   try{const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'excluir',modulo,id})});return await r.json()}catch(e){return {sucesso:false,erro:e.message}}
 }
-async function deleteAnimal(id){const a=db.animais.find(x=>x.id==id);if(!a)return;if(!confirm(`Excluir o animal "${a.nome||''}"? Esta ação não pode ser desfeita.`))return;const r=await deleteRemote('ANIMAIS',id);if(endpoint&&!r.sucesso){alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));return;}db.animais=db.animais.filter(x=>x.id!==id);saveLocal();animais();}
+async function deleteAnimal(id){
+  const a=db.animais.find(x=>x.id==id);
+  if(!a)return;
+
+  if(!confirm(`Excluir o animal "${a.nome||''}"? Esta ação não pode ser desfeita.`))return;
+
+  const r=await deleteRemote('ANIMAIS',id);
+
+  // Se não estiver no Google Drive, ainda assim permite excluir
+  // o registro que está salvo localmente.
+  if(endpoint && !r.sucesso && r.erro!=='Registro não encontrado.'){
+    alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));
+    return;
+  }
+
+  db.animais=db.animais.filter(x=>x.id!==id);
+  saveLocal();
+
+  animais();
+}
 function viewAnimal(id){let a=db.animais.find(x=>x.id==id);app.innerHTML=`<h1>🐾 ${esc(a.nome)}</h1><div class="card">${a.foto?`<img src="${a.foto}" style="max-width:260px;max-height:260px;border-radius:12px">`:''}<p><b>Espécie:</b> ${esc(a.especie)} &nbsp; <b>Sexo:</b> ${esc(a.sexo)} &nbsp; <b>Castrado:</b> ${esc(a.castrado)}</p><p><b>Resgate:</b> ${esc(a.dataResgate)||'-'} &nbsp; <b>Quem resgatou:</b> ${esc(a.resgatou)||'-'}</p><p><b>Local:</b> ${esc(a.local)||'-'}</p><p><b>Situação:</b> ${esc(a.situacao)}</p><p><b>Observações:</b> ${esc(a.obs)||'-'}</p><p><button class="btn alt" onclick="animais()">← Voltar</button> <button class="btn alt" onclick="editAnimal('${a.id}')">✏️ Editar</button> <button class="btn alt" onclick="deleteAnimal('${a.id}')">🗑️ Excluir</button></p></div>`}
 
 function saude(){
