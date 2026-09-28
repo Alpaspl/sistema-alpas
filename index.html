@@ -268,9 +268,152 @@ async function excluirSaude(id){
   saude();
 }
 function castracoes(){
- pageTitle('Castrações');
- app.innerHTML=`<h1>✂️ Controle de castrações</h1><div class="card"><form id="castForm" class="form">${animalSelect('animal','Animal')}${F('data','Data da castração','date')}${F('clinica','Clínica / veterinário')}${F('custo','Custo (R$)','number')}${S('status','Situação',['Agendada','Realizada','Cancelada'])}<div class="field full"><label>Observações / pós-operatório</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar castração</button></div></form></div>${table('castracoes',['animal','Animal','data','Data','clinica','Clínica','custo','Custo','status','Situação'])}`;
- bindSimple('castForm','castracoes','castracao');
+  pageTitle('Castrações');
+
+  app.innerHTML=`
+    <h1>✂️ Controle de castrações</h1>
+
+    <div class="card">
+      <form id="castForm" class="form">
+        ${animalSelect('animal','Animal')}
+        ${F('data','Data da castração','date')}
+        ${F('clinica','Clínica / veterinário')}
+        ${F('custo','Custo (R$)','number')}
+        ${S('status','Situação',['Agendada','Realizada','Cancelada'])}
+
+        <div class="field full">
+          <label>Observações / pós-operatório</label>
+          <textarea name="obs"></textarea>
+        </div>
+
+        <div class="full">
+          <button class="btn">💾 Registrar castração</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Animal</th>
+              <th>Data</th>
+              <th>Clínica</th>
+              <th>Custo</th>
+              <th>Situação</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${
+              db.castracoes.slice().reverse().map(x=>`
+                <tr>
+                  <td>${esc(x.animal)||'-'}</td>
+                  <td>${esc(x.data)||'-'}</td>
+                  <td>${esc(x.clinica)||'-'}</td>
+                  <td>${esc(x.custo)||'-'}</td>
+                  <td>${esc(x.status)||'-'}</td>
+                  <td>
+                    <button class="btn" onclick="editarCastracao('${x.id}')">✏️ Editar</button>
+                    <button class="btn alt" onclick="excluirCastracao('${x.id}')">🗑️ Excluir</button>
+                  </td>
+                </tr>
+              `).join('')
+              ||
+              `<tr><td colspan="6">Nenhum registro.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  bindSimple('castForm','castracoes','castracao');
+}
+ async function excluirCastracao(id){
+  const registro=db.castracoes.find(x=>x.id==id);
+  if(!registro)return;
+
+  if(!confirm('Excluir esta castração? Esta ação não pode ser desfeita.'))return;
+
+  const r=await deleteRemote('CASTRAÇÕES',id);
+
+  // Se não estiver no Google Drive, ainda assim permite excluir
+  // o registro que está salvo localmente.
+  if(endpoint && !r.sucesso && r.erro!=='Registro não encontrado.'){
+    alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));
+    return;
+  }
+
+  db.castracoes=db.castracoes.filter(x=>x.id!==id);
+  saveLocal();
+
+  castracoes();
+}
+ function editarCastracao(id){
+  const registro=db.castracoes.find(x=>x.id==id);
+  if(!registro)return;
+
+  pageTitle('Editar castração');
+
+  app.innerHTML=`
+    <h1>✏️ Editar castração</h1>
+
+    <div class="card">
+      <form id="editCastForm" class="form">
+        ${animalSelect('animal','Animal')}
+        ${F('data','Data da castração','date')}
+        ${F('clinica','Clínica / veterinário')}
+        ${F('custo','Custo (R$)','number')}
+        ${S('status','Situação',['Agendada','Realizada','Cancelada'])}
+
+        <div class="field full">
+          <label>Observações / pós-operatório</label>
+          <textarea name="obs"></textarea>
+        </div>
+
+        <div class="full">
+          <button class="btn">💾 Salvar alterações</button>
+          <button type="button" class="btn alt" onclick="castracoes()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  const form=document.getElementById('editCastForm');
+
+  Object.keys(registro).forEach(k=>{
+    const el=form.elements[k];
+    if(el)el.value=registro[k]??'';
+  });
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    let f=new FormData(e.target);
+    let novo={id:registro.id};
+
+    for(let [k,v] of f.entries()){
+      novo[k]=v;
+    }
+
+    const dr=await deleteRemote('CASTRAÇÕES',registro.id);
+
+    if(endpoint && !dr.sucesso && dr.erro!=='Registro não encontrado.'){
+      alert('Não foi possível atualizar no Google Drive: '+(dr.erro||'erro'));
+      return;
+    }
+
+    db.castracoes=db.castracoes.filter(x=>x.id!==registro.id);
+    db.castracoes.push(novo);
+    saveLocal();
+
+    await sync('castracao',novo,null);
+
+    castracoes();
+  };
 }
 function limpeza(){
  pageTitle('Limpeza');
