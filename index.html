@@ -329,7 +329,37 @@ function table(k,c){
     </div>
   </div>`;
 }
-function bindSimple(formId,k,type){document.getElementById(formId).onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),o={id:uid()};for(let [a,b] of f.entries())if(a!=='foto')o[a]=b;let file=f.get('foto');if(file&&file.size)o.foto=await dataUrl(file);db[k].push(o);saveLocal();await sync(type,o,file);e.target.reset();({compras,saude,castracoes,medicamentos,banhos,limpeza,adocoes,despesas}[k])()}}
+function bindSimple(formId,k,type){
+  document.getElementById(formId).onsubmit=async e=>{
+    e.preventDefault();
+
+    let f=new FormData(e.target);
+    let o={id:uid()};
+
+    for(let [a,b] of f.entries()){
+      if(a!=='foto') o[a]=b;
+    }
+
+    let file=f.get('foto');
+
+    if(file&&file.size){
+      o.foto=await dataUrl(file);
+    }
+
+    const r=await sync(type,o,file);
+
+    if(r.id){
+      o.id=r.id;
+    }
+
+    db[k].push(o);
+    saveLocal();
+
+    e.target.reset();
+
+    ({compras,saude,castracoes,medicamentos,banhos,limpeza,adocoes,despesas}[k])();
+  }
+}
 function dataUrl(file){return new Promise((res,rej)=>{let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
 async function sync(type,o,file){
  if(!endpoint)return {sucesso:false,semConexao:true};
