@@ -49,16 +49,15 @@ const app=document.getElementById('app');
 function money(v){return 'R$ '+(Number(v)||0).toFixed(2).replace('.',',')}
 function animalOptions(){return db.animais.map(a=>`<option value="${esc(a.nome)}">${esc(a.nome)} (${a.especie||''})</option>`).join('')}
 function pageTitle(t){document.getElementById('title').textContent=t}
-document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));b.classList.add('active');({inicio,animais,compras,saude,castracoes,medicamentos,banhos,limpeza,adocoes,despesas,config}[b.dataset.page])()});
+document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));b.classList.add('active');({inicio,animais,saude,castracoes,limpeza,adocoes,despesas,config}[b.dataset.page])()});
 
 function inicio(){
  pageTitle('Início');
  const vivos=db.animais.filter(a=>a.situacao!=='Falecido').length;
  const clin=db.saude.reduce((s,x)=>s+(Number(x.custo)||0),0);
- const comp=db.compras.reduce((s,x)=>s+(Number(x.valor)||0),0);
  app.innerHTML=`<h1>Olá! 👋</h1><p class="muted">Controle dos animais, saúde, compras e rotina do abrigo.</p>
- ${cards([[db.animais.length,'🐾 Animais'],[vivos,'❤️ Vivos'],[db.animais.filter(a=>a.especie==='Cão').length,'🐶 Cães'],[db.animais.filter(a=>a.especie==='Gato').length,'🐱 Gatos'],[db.castracoes.length,'✂️ Castrações'],[db.adocoes.length,'🏠 Adoções'],[money(clin),'🏥 Clínicas'],[money(comp),'🛒 Compras']])}
- <div class="card"><h2>📌 Organização</h2><p>Em <b>Compras / Insumos</b> você registra ração, areia, alimentos, medicamentos e materiais de limpeza, com data, quantidade e valor.</p><p>Em <b>Clínica / Doenças</b> você registra entrada, saída, retorno, diagnóstico e custo.</p><p>Em <b>Castrações</b> fica o histórico de cada animal castrado.</p></div>`;
+ ${cards([[db.animais.length,'🐾 Animais'],[vivos,'❤️ Vivos'],[db.animais.filter(a=>a.especie==='Cão').length,'🐶 Cães'],[db.animais.filter(a=>a.especie==='Gato').length,'🐱 Gatos'],[db.castracoes.length,'✂️ Castrações'],[db.adocoes.length,'🏠 Adoções'],[money(clin),'🏥 Clínicas']])}
+ <div class="card"><h2>📌 Organização</h2><p>Em <b>Clínica / Doenças</b> você registra entrada, saída, retorno, diagnóstico e custo.</p><p>Em <b>Castrações</b> fica o histórico de cada animal castrado.</p></div>`;
 }
 function cards(a){return '<div class="cards">'+a.map(x=>`<div class="card"><div class="muted">${x[1]}</div><div class="metric">${x[0]}</div></div>`).join('')+'</div>'}
 
@@ -91,13 +90,6 @@ async function deleteRemote(modulo,id){
 async function deleteAnimal(id){const a=db.animais.find(x=>x.id==id);if(!a)return;if(!confirm(`Excluir o animal "${a.nome||''}"? Esta ação não pode ser desfeita.`))return;const r=await deleteRemote('ANIMAIS',id);if(endpoint&&!r.sucesso){alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));return;}db.animais=db.animais.filter(x=>x.id!==id);saveLocal();animais();}
 function viewAnimal(id){let a=db.animais.find(x=>x.id==id);app.innerHTML=`<h1>🐾 ${esc(a.nome)}</h1><div class="card">${a.foto?`<img src="${a.foto}" style="max-width:260px;max-height:260px;border-radius:12px">`:''}<p><b>Espécie:</b> ${esc(a.especie)} &nbsp; <b>Sexo:</b> ${esc(a.sexo)} &nbsp; <b>Castrado:</b> ${esc(a.castrado)}</p><p><b>Resgate:</b> ${esc(a.dataResgate)||'-'} &nbsp; <b>Quem resgatou:</b> ${esc(a.resgatou)||'-'}</p><p><b>Local:</b> ${esc(a.local)||'-'}</p><p><b>Situação:</b> ${esc(a.situacao)}</p><p><b>Observações:</b> ${esc(a.obs)||'-'}</p><p><button class="btn alt" onclick="animais()">← Voltar</button> <button class="btn alt" onclick="editAnimal('${a.id}')">✏️ Editar</button> <button class="btn alt" onclick="deleteAnimal('${a.id}')">🗑️ Excluir</button></p></div>`}
 
-
-function compras(){
- pageTitle('Compras / Insumos');
- app.innerHTML=`<h1>🛒 Compras / Insumos</h1><p class="muted">Ração, areia, medicamentos, alimentos, materiais de limpeza e outros.</p>
- <div class="card"><form id="compForm" class="form">${F('data','Data da compra','date')}${S('categoria','Categoria',['Ração','Areia','Medicamento','Alimentos / Patê','Material de limpeza','Insumos','Outros'])}${F('produto','Produto')}${F('quantidade','Quantidade','number')}${F('unidade','Unidade')}${F('fornecedor','Fornecedor')}${F('valor','Valor total (R$)','number')}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar compra</button></div></form></div>${table('compras',['data','Data','categoria','Categoria','produto','Produto','quantidade','Qtd.','unidade','Unidade','valor','Valor'])}`;
- bindSimple('compForm','compras','compra');
-}
 function saude(){
   pageTitle('Clínica / Doenças');
 
@@ -261,16 +253,6 @@ function castracoes(){
  app.innerHTML=`<h1>✂️ Controle de castrações</h1><div class="card"><form id="castForm" class="form">${animalSelect('animal','Animal')}${F('data','Data da castração','date')}${F('clinica','Clínica / veterinário')}${F('custo','Custo (R$)','number')}${S('status','Situação',['Agendada','Realizada','Cancelada'])}<div class="field full"><label>Observações / pós-operatório</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar castração</button></div></form></div>${table('castracoes',['animal','Animal','data','Data','clinica','Clínica','custo','Custo','status','Situação'])}`;
  bindSimple('castForm','castracoes','castracao');
 }
-function medicamentos(){
- pageTitle('Medicamentos');
- app.innerHTML=`<h1>💊 Medicamentos</h1><div class="card"><form id="medForm" class="form">${animalSelect('animal','Animal')}${F('medicamento','Medicamento')}${F('inicio','Início','date')}${F('fim','Fim','date')}${F('dosagem','Dosagem / frequência')}${F('custo','Custo (R$)','number')}<div class="field full"><label>Orientação / observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar medicamento</button></div></form></div>${table('medicamentos',['animal','Animal','medicamento','Medicamento','inicio','Início','fim','Fim','dosagem','Dosagem','custo','Custo'])}`;
- bindSimple('medForm','medicamentos','medicamento');
-}
-function banhos(){
- pageTitle('Banhos');
- app.innerHTML=`<h1>🛁 Banhos</h1><div class="card"><form id="banhoForm" class="form">${animalSelect('animal','Animal')}${F('data','Data do banho','date')}${F('proximo','Próximo banho','date')}${F('responsavel','Responsável')}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar banho</button></div></form></div>${table('banhos',['animal','Animal','data','Data','proximo','Próximo','responsavel','Responsável'])}`;
- bindSimple('banhoForm','banhos','banho');
-}
 function limpeza(){
  pageTitle('Limpeza');
  app.innerHTML=`<h1>🧹 Limpeza do abrigo</h1><div class="card"><form id="limpezaForm" class="form">${F('data','Data da limpeza','date')}${F('area','Área / setor')}${F('responsavel','Responsável')}${F('produto','Produto utilizado')}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar limpeza</button></div></form></div>${table('limpeza',['data','Data','area','Área','responsavel','Responsável','produto','Produto'])}`;
@@ -289,7 +271,7 @@ function despesas(){
 function config(){
  pageTitle('Conexão');
  app.innerHTML=`<h1>⚙️ Conexão com Google Drive</h1><div class="card"><p>O endereço abaixo é a URL do seu Google Apps Script publicada como aplicativo da Web.</p><div class="field"><label>URL /exec</label><input id="ep" value="${esc(endpoint)}" placeholder="https://script.google.com/macros/s/.../exec"></div><button class="btn" onclick="saveEndpoint()">💾 Salvar conexão</button> <button class="btn alt" onclick="testEndpoint()">🔗 Testar</button><div id="conn" class="status hidden"></div></div>
- <div class="card"><h2>📌 Como os módulos serão armazenados</h2><p>O Drive pode receber pastas para <b>Animais, Compras, Clínica, Castrações, Medicamentos, Banhos, Limpeza e Adoções</b>. Os registros ficam em uma planilha para consulta e relatórios.</p></div>`;
+ <div class="card"><h2>📌 Como os módulos serão armazenados</h2><p>O Drive pode receber pastas para <b>Animais, Clínica, Castrações, Limpeza, Adoções e Despesas</b>. Os registros ficam em uma planilha para consulta e relatórios.</p></div>`;
 }
 function saveEndpoint(){endpoint=document.getElementById('ep').value.trim();localStorage.setItem('ALPAS_ENDPOINT',endpoint);alert('Conexão salva.')}
 async function testEndpoint(){let c=document.getElementById('conn');c.classList.remove('hidden');try{let r=await fetch(endpoint);let j=await r.json();c.textContent=j.sucesso?'✅ Sistema ALPAS conectado ao Google Drive.':'❌ '+(j.erro||j.mensagem||'Falha')}catch(e){c.textContent='❌ Não foi possível conectar. Verifique a URL /exec.'}}
@@ -356,13 +338,13 @@ function bindSimple(formId,k,type){
 
     e.target.reset();
 
-    ({compras,saude,castracoes,medicamentos,banhos,limpeza,adocoes,despesas}[k])();
+    ({saude,castracoes,limpeza,adocoes,despesas}[k])();
   }
 }
 function dataUrl(file){return new Promise((res,rej)=>{let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
 async function sync(type,o,file){
  if(!endpoint)return {sucesso:false,semConexao:true};
- const modulo={animal:'ANIMAIS',compra:'COMPRAS',saude:'CLÍNICA E DOENÇAS',castracao:'CASTRAÇÕES',medicamento:'MEDICAMENTOS',banho:'BANHOS',limpeza:'LIMPEZA',adocao:'ADOÇÕES',despesa:'DESPESAS'}[type]||type;
+ const modulo={animal:'ANIMAIS',saude:'CLÍNICA E DOENÇAS',castracao:'CASTRAÇÕES',limpeza:'LIMPEZA',adocao:'ADOÇÕES',despesa:'DESPESAS'}[type]||type;
  try{
    const payload={action:'salvar',modulo,dados:o};
    if(file&&file.size){payload.foto={name:file.name,mimeType:file.type||'application/octet-stream',data:(o.foto||'').split(',')[1]||''};}
