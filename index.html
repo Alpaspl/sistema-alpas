@@ -73,13 +73,119 @@ function renderAnimals(){
 }
 function animalForm(existing=null){
   const a=existing||{};
-  app.innerHTML=`<h1>${existing?'✏️ Editar animal':'➕ Cadastro / Entrada do animal'}</h1><div class="card"><form id="animalForm" class="form">
-${F('nome','Nome',1)}${F('dataResgate','Data do resgate','date')}${F('resgatou','Quem resgatou')}${F('local','Local do resgate')}${S('especie','Espécie',['Cão','Gato'])}${S('sexo','Sexo',['Macho','Fêmea'])}${S('castrado','Castrado',['Não','Sim','Agendado'])}${S('situacao','Situação',['No abrigo','Disponível para adoção','Em tratamento','Lar temporário','Adotado','Falecido'])}${F('foto','Foto','file')}<div class="field full"><label>Situação em que estava / observações</label><textarea name="obs" rows="4"></textarea></div><div class="full"><button class="btn">💾 ${existing?'Salvar alterações':'Salvar animal'}</button> <button type="button" class="btn alt" onclick="animais()">Cancelar</button></div></form><div id="as" class="status hidden"></div></div>`;
+
+  app.innerHTML=`
+    <h1>${existing?'✏️ Editar animal':'➕ Cadastro / Entrada do animal'}</h1>
+
+    <div class="card">
+      <form id="animalForm" class="form">
+
+        <h2 class="full">🐾 Identificação</h2>
+
+        ${F('nome','Nome',1)}
+        ${F('idade','Idade aproximada')}
+        ${S('porte','Porte',['Pequeno','Médio','Grande'])}
+        ${S('especie','Espécie',['Cão','Gato'])}
+        ${S('sexo','Sexo',['Macho','Fêmea'])}
+
+        <h2 class="full">📍 Resgate</h2>
+
+        ${F('dataResgate','Data do resgate','date')}
+        ${F('resgatou','Quem resgatou')}
+        ${F('local','Local do resgate')}
+
+        <div class="field full">
+          <label>Situação em que estava</label>
+          <textarea name="situacaoResgate" rows="3"></textarea>
+        </div>
+
+        <h2 class="full">🏥 Saúde</h2>
+
+        ${S('castrado','Castrado',['Não','Sim','Agendado'])}
+        ${S('vacinacao','Vacinação',['Não vacinado','Parcial','Completa'])}
+        ${S('vermifugado','Vermifugado',['Não','Sim'])}
+        ${S('passouClinica','Passou por clínica?',['Não','Sim'])}
+        ${S('situacaoTratamento','Situação do tratamento',['Sem tratamento','Em tratamento na clínica','Em tratamento no abrigo','Tratamento finalizado'])}
+
+        <div class="field full">
+          <label>Observações de saúde</label>
+          <textarea name="obs" rows="4"></textarea>
+        </div>
+
+        <h2 class="full">🏠 Situação atual</h2>
+
+        ${S('situacao','Situação',['No abrigo','Disponível para adoção','Em tratamento','Lar temporário','Adotado','Falecido'])}
+
+        <h2 class="full">❤️ Adoção</h2>
+
+        ${F('dataAdocao','Data da adoção','date')}
+        ${F('nomeAdotante','Nome do adotante')}
+
+        <h2 class="full">🕊️ Óbito</h2>
+
+        ${F('dataObito','Data do óbito','date')}
+        ${F('motivoObito','Motivo / causa do óbito')}
+
+        <h2 class="full">📷 Foto</h2>
+
+        ${F('foto','Foto','file')}
+
+        <div class="full">
+          <button class="btn">💾 ${existing?'Salvar alterações':'Salvar animal'}</button>
+          <button type="button" class="btn alt" onclick="animais()">Cancelar</button>
+        </div>
+
+      </form>
+
+      <div id="as" class="status hidden"></div>
+    </div>
+  `;
+
   const form=document.getElementById('animalForm');
-  Object.keys(a).forEach(k=>{const el=form.elements[k];if(el&&k!=='foto')el.value=a[k]??''});
-  form.onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),o={id:existing?.id||uid()};for(let [k,v] of f.entries())if(k!=='foto')o[k]=v;let file=f.get('foto');if(file&&file.size)o.foto=await dataUrl(file);else if(existing?.foto)o.foto=existing.foto;
-    if(existing){const dr=await deleteRemote('ANIMAIS',existing.id);if(endpoint&&!dr.sucesso){alert('Não foi possível atualizar no Google Drive: '+(dr.erro||'erro'));return;}db.animais=db.animais.filter(x=>x.id!==existing.id);}
-    db.animais.push(o);saveLocal();const r=await sync('animal',o,file);if(r.id)o.id=r.id;saveLocal();animais();
+
+  Object.keys(a).forEach(k=>{
+    const el=form.elements[k];
+    if(el&&k!=='foto')el.value=a[k]??'';
+  });
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    let f=new FormData(e.target);
+    let o={id:existing?.id||uid()};
+
+    for(let [k,v] of f.entries()){
+      if(k!=='foto')o[k]=v;
+    }
+
+    let file=f.get('foto');
+
+    if(file&&file.size){
+      o.foto=await dataUrl(file);
+    }else if(existing?.foto){
+      o.foto=existing.foto;
+    }
+
+    if(existing){
+      const dr=await deleteRemote('ANIMAIS',existing.id);
+
+      if(endpoint&&!dr.sucesso){
+        alert('Não foi possível atualizar no Google Drive: '+(dr.erro||'erro'));
+        return;
+      }
+
+      db.animais=db.animais.filter(x=>x.id!==existing.id);
+    }
+
+    db.animais.push(o);
+    saveLocal();
+
+    const r=await sync('animal',o,file);
+
+    if(r.id)o.id=r.id;
+
+    saveLocal();
+    animais();
   };
 }
 function editAnimal(id){const a=db.animais.find(x=>x.id==id);if(a)animalForm(a)}
