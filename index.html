@@ -522,9 +522,148 @@ function castracoes(){
   };
 }
 function limpeza(){
- pageTitle('Limpeza');
- app.innerHTML=`<h1>🧹 Limpeza do abrigo</h1><div class="card"><form id="limpezaForm" class="form">${F('data','Data da limpeza','date')}${F('area','Área / setor')}${F('responsavel','Responsável')}${F('produto','Produto utilizado')}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar limpeza</button></div></form></div>${table('limpeza',['data','Data','area','Área','responsavel','Responsável','produto','Produto'])}`;
- bindSimple('limpezaForm','limpeza','limpeza');
+  pageTitle('Limpeza');
+
+  app.innerHTML=`
+    <h1>🧹 Limpeza do abrigo</h1>
+
+    <div class="card">
+      <form id="limpezaForm" class="form">
+        ${F('data','Data da limpeza','date')}
+        ${F('area','Área / setor')}
+        ${F('responsavel','Responsável')}
+        ${F('produto','Produto utilizado')}
+
+        <div class="field full">
+          <label>Observações</label>
+          <textarea name="obs"></textarea>
+        </div>
+
+        <div class="full">
+          <button class="btn">💾 Registrar limpeza</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Área</th>
+              <th>Responsável</th>
+              <th>Produto</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${
+              db.limpeza.slice().reverse().map(x=>`
+                <tr>
+                  <td>${esc(x.data)||'-'}</td>
+                  <td>${esc(x.area)||'-'}</td>
+                  <td>${esc(x.responsavel)||'-'}</td>
+                  <td>${esc(x.produto)||'-'}</td>
+                  <td>
+                    <button class="btn" onclick="editarLimpeza('${x.id}')">✏️ Editar</button>
+                    <button class="btn alt" onclick="excluirLimpeza('${x.id}')">🗑️ Excluir</button>
+                  </td>
+                </tr>
+              `).join('')
+              ||
+              `<tr><td colspan="5">Nenhum registro.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  bindSimple('limpezaForm','limpeza','limpeza');
+}
+ function editarLimpeza(id){
+  const registro=db.limpeza.find(x=>x.id==id);
+  if(!registro)return;
+
+  pageTitle('Editar limpeza');
+
+  app.innerHTML=`
+    <h1>✏️ Editar limpeza</h1>
+
+    <div class="card">
+      <form id="editLimpezaForm" class="form">
+
+        ${F('data','Data da limpeza','date')}
+        ${F('area','Área / setor')}
+        ${F('responsavel','Responsável')}
+        ${F('produto','Produto utilizado')}
+
+        <div class="field full">
+          <label>Observações</label>
+          <textarea name="obs"></textarea>
+        </div>
+
+        <div class="full">
+          <button class="btn">💾 Salvar alterações</button>
+          <button type="button" class="btn alt" onclick="limpeza()">Cancelar</button>
+        </div>
+
+      </form>
+    </div>
+  `;
+
+  const form=document.getElementById('editLimpezaForm');
+
+  Object.keys(registro).forEach(k=>{
+    const el=form.elements[k];
+    if(el)el.value=registro[k]??'';
+  });
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    let f=new FormData(e.target);
+    let novo={id:registro.id};
+
+    for(let [k,v] of f.entries()){
+      novo[k]=v;
+    }
+
+    const dr=await deleteRemote('LIMPEZA',registro.id);
+
+    if(endpoint && !dr.sucesso && dr.erro!=='Registro não encontrado.'){
+      alert('Não foi possível atualizar no Google Drive: '+(dr.erro||'erro'));
+      return;
+    }
+
+    db.limpeza=db.limpeza.filter(x=>x.id!==registro.id);
+    db.limpeza.push(novo);
+    saveLocal();
+
+    await sync('limpeza',novo,null);
+
+    limpeza();
+  };
+}
+ async function excluirLimpeza(id){
+  const registro=db.limpeza.find(x=>x.id==id);
+  if(!registro)return;
+
+  if(!confirm('Excluir este registro de limpeza? Esta ação não pode ser desfeita.'))return;
+
+  const r=await deleteRemote('LIMPEZA',id);
+
+  if(endpoint && !r.sucesso && r.erro!=='Registro não encontrado.'){
+    alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));
+    return;
+  }
+
+  db.limpeza=db.limpeza.filter(x=>x.id!==id);
+  saveLocal();
+
+  limpeza();
 }
 function adocoes(){
  pageTitle('Adoções');
