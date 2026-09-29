@@ -682,7 +682,9 @@ function adocoes(){
         ${F('telefone','Telefone / WhatsApp')}
         ${F('email','E-mail')}
         ${F('endereco','Endereço completo')}
-        ${F('foto','Foto / documento','file')}
+        ${F('termoAdocao','Termo de adoção','file')}
+${F('fotoAdocao','Foto da adoção','file')}
+${F('outrosDocumentos','Outros documentos','file')}
         ${S('status','Situação',['Em análise','Adotado','Acompanhamento','Cancelado'])}
 
         <div class="field full">
@@ -737,7 +739,7 @@ function adocoes(){
     </div>
   `;
 
-  bindSimple('adocaoForm','adocoes','adocao');
+  bindAdocao();
 }
  function editarAdocao(id){
   const registro=db.adocoes.find(x=>x.id==id);
@@ -1038,6 +1040,69 @@ function bindSimple(formId,k,type){
 
     ({saude,castracoes,limpeza,adocoes,despesas}[k])();
   }
+}
+ async function bindAdocao(){
+  const form=document.getElementById('adocaoForm');
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    const f=new FormData(e.target);
+
+    let o={id:uid()};
+
+    for(let [k,v] of f.entries()){
+      if(
+        k!=='termoAdocao' &&
+        k!=='fotoAdocao' &&
+        k!=='outrosDocumentos'
+      ){
+        o[k]=v;
+      }
+    }
+
+    const termo=f.get('termoAdocao');
+    const foto=f.get('fotoAdocao');
+    const outros=f.get('outrosDocumentos');
+
+if(termo&&termo.size){
+  o.termoAdocao={
+    data:await dataUrl(termo),
+    name:termo.name,
+    mimeType:termo.type
+  };
+}
+
+if(foto&&foto.size){
+  o.fotoAdocao={
+    data:await dataUrl(foto),
+    name:foto.name,
+    mimeType:foto.type
+  };
+}
+
+if(outros&&outros.size){
+  o.outrosDocumentos={
+    data:await dataUrl(outros),
+    name:outros.name,
+    mimeType:outros.type
+  };
+}
+
+    const r=await sync('adocao',o,null);
+
+    if(r.id){
+      o.id=r.id;
+    }
+
+    db.adocoes.push(o);
+
+    saveLocal();
+
+    e.target.reset();
+
+    adocoes();
+  };
 }
 function dataUrl(file){return new Promise((res,rej)=>{let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
 async function sync(type,o,file){
