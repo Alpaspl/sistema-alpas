@@ -827,9 +827,144 @@ function adocoes(){
   adocoes();
 }
 function despesas(){
- pageTitle('Despesas');
- app.innerHTML=`<h1>💰 Despesas</h1><div class="card"><form id="despForm" class="form">${F('data','Data','date')}${S('categoria','Categoria',['Clínica','Medicamentos','Ração','Areia','Alimentos','Limpeza','Castração','Outros'])}${F('descricao','Descrição')}${F('valor','Valor (R$)','number')}${F('animal','Animal (se houver)')}<div class="full"><button class="btn">💾 Registrar despesa</button></div></form></div>${table('despesas',['data','Data','categoria','Categoria','descricao','Descrição','animal','Animal','valor','Valor'])}`;
- bindSimple('despForm','despesas','despesa');
+  pageTitle('Despesas');
+
+  app.innerHTML=`
+    <h1>💰 Despesas</h1>
+
+    <div class="card">
+      <form id="despForm" class="form">
+
+        ${F('data','Data','date')}
+        ${S('categoria','Categoria',['Clínica','Medicamentos','Ração','Areia','Alimentos','Limpeza','Castração','Outros'])}
+        ${F('descricao','Descrição')}
+        ${F('valor','Valor (R$)','number')}
+        ${F('animal','Animal (se houver)')}
+
+        <div class="full">
+          <button class="btn">💾 Registrar despesa</button>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Categoria</th>
+              <th>Descrição</th>
+              <th>Animal</th>
+              <th>Valor</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${
+              db.despesas.slice().reverse().map(x=>`
+                <tr>
+                  <td>${esc(x.data)||'-'}</td>
+                  <td>${esc(x.categoria)||'-'}</td>
+                  <td>${esc(x.descricao)||'-'}</td>
+                  <td>${esc(x.animal)||'-'}</td>
+                  <td>${esc(x.valor)||'-'}</td>
+                  <td>
+                    <button class="btn" onclick="editarDespesa('${x.id}')">✏️ Editar</button>
+                    <button class="btn alt" onclick="excluirDespesa('${x.id}')">🗑️ Excluir</button>
+                  </td>
+                </tr>
+              `).join('')
+              ||
+              `<tr><td colspan="6">Nenhum registro.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  bindSimple('despForm','despesas','despesa');
+}
+ function editarDespesa(id){
+  const registro=db.despesas.find(x=>x.id==id);
+  if(!registro)return;
+
+  pageTitle('Editar despesa');
+
+  app.innerHTML=`
+    <h1>✏️ Editar despesa</h1>
+
+    <div class="card">
+      <form id="editDespForm" class="form">
+
+        ${F('data','Data','date')}
+        ${S('categoria','Categoria',['Clínica','Medicamentos','Ração','Areia','Alimentos','Limpeza','Castração','Outros'])}
+        ${F('descricao','Descrição')}
+        ${F('valor','Valor (R$)','number')}
+        ${F('animal','Animal (se houver)')}
+
+        <div class="full">
+          <button class="btn">💾 Salvar alterações</button>
+          <button type="button" class="btn alt" onclick="despesas()">Cancelar</button>
+        </div>
+
+      </form>
+    </div>
+  `;
+
+  const form=document.getElementById('editDespForm');
+
+  Object.keys(registro).forEach(k=>{
+    const el=form.elements[k];
+    if(el)el.value=registro[k]??'';
+  });
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    let f=new FormData(e.target);
+    let novo={id:registro.id};
+
+    for(let [k,v] of f.entries()){
+      novo[k]=v;
+    }
+
+    const dr=await deleteRemote('DESPESAS',registro.id);
+
+    if(endpoint && !dr.sucesso && dr.erro!=='Registro não encontrado.'){
+      alert('Não foi possível atualizar no Google Drive: '+(dr.erro||'erro'));
+      return;
+    }
+
+    db.despesas=db.despesas.filter(x=>x.id!==registro.id);
+    db.despesas.push(novo);
+    saveLocal();
+
+    await sync('despesa',novo,null);
+
+    despesas();
+  };
+}
+ async function excluirDespesa(id){
+  const registro=db.despesas.find(x=>x.id==id);
+  if(!registro)return;
+
+  if(!confirm('Excluir este registro de despesa? Esta ação não pode ser desfeita.'))return;
+
+  const r=await deleteRemote('DESPESAS',id);
+
+  if(endpoint && !r.sucesso && r.erro!=='Registro não encontrado.'){
+    alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));
+    return;
+  }
+
+  db.despesas=db.despesas.filter(x=>x.id!==id);
+  saveLocal();
+
+  despesas();
 }
 function config(){
  pageTitle('Conexão');
