@@ -666,9 +666,165 @@ function limpeza(){
   limpeza();
 }
 function adocoes(){
- pageTitle('Adoções');
- app.innerHTML=`<h1>🏠 Adoções</h1><div class="card"><form id="adocaoForm" class="form">${animalSelect('animal','Animal')}${F('data','Data da adoção','date')}${F('adotante','Nome do adotante')}${F('cpf','CPF')}${F('rg','RG')}${F('telefone','Telefone / WhatsApp')}${F('email','E-mail')}${F('endereco','Endereço completo')}${F('foto','Foto / documento','file')}${S('status','Situação',['Em análise','Adotado','Acompanhamento','Cancelado'])}<div class="field full"><label>Observações</label><textarea name="obs"></textarea></div><div class="full"><button class="btn">💾 Registrar adoção</button></div></form></div>${table('adocoes',['animal','Animal','data','Data','adotante','Adotante','telefone','Telefone','endereco','Endereço','status','Situação'])}`;
- bindSimple('adocaoForm','adocoes','adocao');
+  pageTitle('Adoções');
+
+  app.innerHTML=`
+    <h1>🏠 Adoções</h1>
+
+    <div class="card">
+      <form id="adocaoForm" class="form">
+
+        ${animalSelect('animal','Animal')}
+        ${F('data','Data da adoção','date')}
+        ${F('adotante','Nome do adotante')}
+        ${F('cpf','CPF')}
+        ${F('rg','RG')}
+        ${F('telefone','Telefone / WhatsApp')}
+        ${F('email','E-mail')}
+        ${F('endereco','Endereço completo')}
+        ${F('foto','Foto / documento','file')}
+        ${S('status','Situação',['Em análise','Adotado','Acompanhamento','Cancelado'])}
+
+        <div class="field full">
+          <label>Observações</label>
+          <textarea name="obs"></textarea>
+        </div>
+
+        <div class="full">
+          <button class="btn">💾 Registrar adoção</button>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Animal</th>
+              <th>Data</th>
+              <th>Adotante</th>
+              <th>Telefone</th>
+              <th>Endereço</th>
+              <th>Situação</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${
+              db.adocoes.slice().reverse().map(x=>`
+                <tr>
+                  <td>${esc(x.animal)||'-'}</td>
+                  <td>${esc(x.data)||'-'}</td>
+                  <td>${esc(x.adotante)||'-'}</td>
+                  <td>${esc(x.telefone)||'-'}</td>
+                  <td>${esc(x.endereco)||'-'}</td>
+                  <td>${esc(x.status)||'-'}</td>
+                  <td>
+                    <button class="btn" onclick="editarAdocao('${x.id}')">✏️ Editar</button>
+                    <button class="btn alt" onclick="excluirAdocao('${x.id}')">🗑️ Excluir</button>
+                  </td>
+                </tr>
+              `).join('')
+              ||
+              `<tr><td colspan="7">Nenhum registro.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  bindSimple('adocaoForm','adocoes','adocao');
+}
+ function editarAdocao(id){
+  const registro=db.adocoes.find(x=>x.id==id);
+  if(!registro)return;
+
+  pageTitle('Editar adoção');
+
+  app.innerHTML=`
+    <h1>✏️ Editar adoção</h1>
+
+    <div class="card">
+      <form id="editAdocaoForm" class="form">
+
+        ${animalSelect('animal','Animal')}
+        ${F('data','Data da adoção','date')}
+        ${F('adotante','Nome do adotante')}
+        ${F('cpf','CPF')}
+        ${F('rg','RG')}
+        ${F('telefone','Telefone / WhatsApp')}
+        ${F('email','E-mail')}
+        ${F('endereco','Endereço completo')}
+        ${S('status','Situação',['Em análise','Adotado','Acompanhamento','Cancelado'])}
+
+        <div class="field full">
+          <label>Observações</label>
+          <textarea name="obs"></textarea>
+        </div>
+
+        <div class="full">
+          <button class="btn">💾 Salvar alterações</button>
+          <button type="button" class="btn alt" onclick="adocoes()">Cancelar</button>
+        </div>
+
+      </form>
+    </div>
+  `;
+
+  const form=document.getElementById('editAdocaoForm');
+
+  Object.keys(registro).forEach(k=>{
+    const el=form.elements[k];
+    if(el)el.value=registro[k]??'';
+  });
+
+  form.onsubmit=async e=>{
+    e.preventDefault();
+
+    let f=new FormData(e.target);
+    let novo={id:registro.id};
+
+    for(let [k,v] of f.entries()){
+      novo[k]=v;
+    }
+
+    const dr=await deleteRemote('ADOÇÕES',registro.id);
+
+    if(endpoint && !dr.sucesso && dr.erro!=='Registro não encontrado.'){
+      alert('Não foi possível atualizar no Google Drive: '+(dr.erro||'erro'));
+      return;
+    }
+
+    db.adocoes=db.adocoes.filter(x=>x.id!==registro.id);
+    db.adocoes.push(novo);
+    saveLocal();
+
+    await sync('adocao',novo,null);
+
+    adocoes();
+  };
+}
+ async function excluirAdocao(id){
+  const registro=db.adocoes.find(x=>x.id==id);
+  if(!registro)return;
+
+  if(!confirm('Excluir este registro de adoção? Esta ação não pode ser desfeita.'))return;
+
+  const r=await deleteRemote('ADOÇÕES',id);
+
+  if(endpoint && !r.sucesso && r.erro!=='Registro não encontrado.'){
+    alert('Não foi possível excluir do Google Drive: '+(r.erro||'erro'));
+    return;
+  }
+
+  db.adocoes=db.adocoes.filter(x=>x.id!==id);
+  saveLocal();
+
+  adocoes();
 }
 function despesas(){
  pageTitle('Despesas');
